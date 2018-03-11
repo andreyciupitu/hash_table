@@ -1,0 +1,29 @@
+Nume: Ciupitu Andrei Valentin
+Grupa: 332CC
+Tema 1 SO
+
+=========================== Mod de implementare ==============================
+
+Am implementat hash table-ul ca un vector de liste, fiecare lista reprezentand
+un bucket. Structura de hash table contine si un pointer la functia de hash.
+
+Listele au un element santinela la inceput pentru a simplifica functiile de
+add si remove.
+
+Pentru operatia de add, este folosita functia de hash pentru a determina
+bucketul apoi se verifica daca elementul exista deja in lista pentru a evita
+elementele duplicate.
+
+Pentru functia de remove, se gaseste bucketul cu functia de hash si apoi se
+cauta elementul prin lista, stergandu-l daca este gasit.
+
+La operatia de clear se sterg elementele din bucket-uri, dar bucket-urile
+raman initializate (nu se sterge elementul santinela).
+
+Pentru operatia de resize creez un hash table nou cu dimensiunea dorita si
+apoi se transfera elementele din hash-ul vechi in cel nou. La sfarsit se
+sterge hash-ul vechi.
+
+Pentru operatiile de find, print si print_bucket se verifica mai intai daca
+este prezent al treilea parametru si se deschid fisierele daca este cazul.
+Dupa realizarea comenzii se inchid fisierele.

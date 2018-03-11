@@ -1,129 +1,218 @@
 #include <stdio.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "list.h"
 #include "hash_table.h"
+#include "utils.h"
+#include "hash.h"
 
-#define DIE(assertion, call_description)								\
-	do {												\
-		if (assertion) {									\
-			fprintf(stderr, "(%s, %d): ",							\
-				__FILE__, __LINE__);							\
-			perror(call_description);							\
-			exit(errno);									\
-		}											\
-	} while (0)
+#define BUFSIZE 20000
+
+static hash_table *parse_command(hash_table *table, char *cmd);
 
 int main(int argc, char *argv[])
 {
 	int i;
-	char buffer[20001];
-	char *token;
-	if (argc >= 2)
-		for (i = 2; i < argc; i++) {
-			FILE *fin = fopen(argv[i], "r");
+	char buffer[BUFSIZE];
+	unsigned int size;
+	FILE *fin;
+	hash_table *t;
+	int status = 0;
 
-			/* Jump over the next file if the
-			   current one can't be opened */
+	/*
+	 * Check for corrent number of argumets
+	 */
+	CUSTOM_DIE(argc < 2, "Usage: ./tema1 SIZE [INPUT_FILES]",
+		INVALID_PARAMETERS);
+
+	/*
+	 * Init the hash table
+	 */
+	status = sscanf(argv[1], "%u", &size);
+	CUSTOM_DIE(status <= 0, "Size argument must be a positive number",
+		INVALID_PARAMETERS);
+	t = new_hash_table(size, hash);
+
+	status = 0;
+	if (argc > 2)
+		for (i = 2; i < argc; i++) {
+			fin = fopen(argv[i], "r");
+
+			/*
+			 * Jump to the next file if the
+			 * current one can't be opened
+			 */
 			if (fin == NULL)
 				continue;
 
-			fgets(buffer, 20000, fin);
-			buffer[strlen(buffer) - 1] = 0;
-			//parse_command(buffer);
+			while (fgets(buffer, BUFSIZE, fin) != NULL)
+				t = parse_command(t, buffer);
 
-			fclose(fin);
+			status = fclose(fin);
+			DIE(status < 0, "Error closing file");
 		}
-	int size;
-	sscanf(argv[1], "%d", &size);
-	hash_table t;
-	init_hash_table(&t, size);
-	add_to_hash_table(&t, "cacat");
-	add_to_hash_table(&t, "cacat");
-	add_to_hash_table(&t, "mizerie");
-	add_to_hash_table(&t, "pisat");
-	add_to_hash_table(&t, "pula");
-	print_hash_table(&t, stdout);
-	resize_hash_table(&t, size / 2);
-	print_hash_table(&t, stdout);
-	resize_hash_table(&t, size * 2);
-	print_hash_table(&t, stdout);
-	remove_from_hash_table(&t, "cacat");
-	print_bucket(&t, 0, stdout);
-	print_hash_table(&t, stdout);
-	clear_hash_table(&t);
-	print_hash_table(&t, stdout);
-	destroy_hash_table(&t);
-	return 0;
+	else
+		while (fgets(buffer, BUFSIZE, stdin) != NULL)
+			t = parse_command(t, buffer);
+
+	destroy_hash_table(t);
+	return status;
 }
 
-void parse_command(hash_table *table, char *cmd)
+static hash_table *parse_command(hash_table *table, char *buffer)
 {
-	char *token;
+	char *cmd, *parameter;
 	FILE *fout = stdout;
 	int tmp;
-	token = strtok(cmd, " ");
+	char sep[] = " \n";
+	int status = 0;
 
-	if (strcmp(token, "add") == 0)
-		add_to_hash_table(table, strtok(NULL, " "));
+	cmd = strtok(buffer, sep);
 
-	if (strcmp(token, "remove") == 0)
-		remove_from_hash_table(table, strtok(NULL, " "));
+	/*
+	 * Check for empty line
+	 */
+	if (cmd == NULL)
+		return table;
 
-	if (strcmp(token, "find") == 0) {
-		token = strtok(NULL, " ");
+	/*
+	 * Add command
+	 */
+	if (strcmp(cmd, "add") == 0) {
+		parameter = strtok(NULL, sep);
+		CUSTOM_DIE(parameter == NULL, "Invalid Command",
+			INVALID_ARGUMENT);
+		add_to_hash_table(table, parameter);
+		return table;
+	}
 
-		tmp = contained_in_hash_table(table, token);
+	/*
+	 * Remove command
+	 */
+	if (strcmp(cmd, "remove") == 0) {
+		parameter = strtok(NULL, sep);
+		CUSTOM_DIE(parameter == NULL, "Invalid Command",
+			INVALID_ARGUMENT);
+		remove_from_hash_table(table, parameter);
+		return table;
+	}
 
-		token = strtok(NULL, " ");
+	/*
+	 * Find command
+	 */
+	if (strcmp(cmd, "find") == 0) {
+		parameter = strtok(NULL, sep);
+		CUSTOM_DIE(parameter == NULL, "Invalid Command",
+			INVALID_ARGUMENT);
+		tmp = contained_in_hash_table(table, parameter);
 
-		if (token != NULL) {
-			fout = fopen(token, "a");
-			DIE(fout == NULL, "Error opening file: ");
+		/*
+		 * Check for output files
+		 */
+		parameter = strtok(NULL, sep);
+		if (parameter != NULL) {
+			fout = fopen(parameter, "a");
+			DIE(fout == NULL, "Error opening file");
 		}
 
-		if (tmp) 
+		if (tmp)
 			fprintf(fout, "True\n");
 		else
 			fprintf(fout, "False\n");
+
+		/*
+		 * Close output files, if any
+		 */
+		if (parameter != NULL) {
+			status = fclose(fout);
+			DIE(status < 0, "Error closing file");
+		}
+		return table;
 	}
 
-	if (strcmp(token, "clear") == 0)
+	/*
+	 * Clear command
+	 */
+	if (strcmp(cmd, "clear") == 0) {
 		clear_hash_table(table);
-
-	if (strcmp(token, "resize") == 0) {
-		token = strtok(NULL, " ");
-		if (strcmp(token, "double") == 0)
-			resize_hash_table(table, table->size * 2);
-		if (strcmp(token, "halve") == 0)
-			resize_hash_table(table, table->size / 2);
+		return table;
 	}
 
-	if (strcmp(token, "print") == 0) {
-		token = strtok(NULL, " ");
+	/*
+	 * Resize command
+	 */
+	if (strcmp(cmd, "resize") == 0) {
+		parameter = strtok(NULL, sep);
+		CUSTOM_DIE(parameter == NULL, "Invalid Command",
+			INVALID_ARGUMENT);
 
-		if (token != NULL) {
-			fout = fopen(token, "a");
-			DIE(fout == NULL, "Error opening file: ");
+		if (strcmp(parameter, "double") == 0) {
+			table = resize_hash_table(table, table->size * 2);
+			return table;
+		}
+		if (strcmp(parameter, "halve") == 0) {
+			table = resize_hash_table(table, table->size / 2);
+			return table;
+		}
+	}
+
+	/*
+	 * Print
+	 */
+	if (strcmp(cmd, "print") == 0) {
+		/*
+		 * Check for output files
+		 */
+		parameter = strtok(NULL, sep);
+		if (parameter != NULL) {
+			fout = fopen(parameter, "a");
+			DIE(fout == NULL, "Error opening file");
 		}
 
 		print_hash_table(table, fout);
-	}
-	
-	if (strcmp(token, "print_bucket") == 0) {
-		token = strtok(NULL, " ");
-		sscanf(token, "%d", &tmp);
 
-		if (token != NULL) {
-			fout = fopen(token, "a");
-			DIE(fout == NULL, "Error opening file: ");
+		/*
+		 * Close output files, if any
+		 */
+		if (parameter != NULL) {
+			status = fclose(fout);
+			DIE(status < 0, "Error closing file");
+		}
+		return table;
+	}
+
+	/*
+	 * Print bucket
+	 */
+	if (strcmp(cmd, "print_bucket") == 0) {
+		parameter = strtok(NULL, sep);
+		CUSTOM_DIE(parameter == NULL, "Invalid Command",
+			INVALID_ARGUMENT);
+		status = sscanf(parameter, "%u", &tmp);
+		CUSTOM_DIE(status <= 0, "Index must be a positive number",
+			INVALID_ARGUMENT);
+
+		/*
+		 * Check for output files
+		 */
+		parameter = strtok(NULL, sep);
+		if (parameter != NULL) {
+			fout = fopen(parameter, "a");
+			DIE(fout == NULL, "Error opening file");
 		}
 
 		print_bucket(table, tmp, fout);
+
+		/*
+		 * Close output files, if any
+		 */
+		if (parameter != NULL) {
+			status = fclose(fout);
+			DIE(status < 0, "Error closing file");
+		}
+		return table;
 	}
+
+	fprintf(stderr, "Invalid command\n");
+	exit(INVALID_COMMAND);
 }
-
-
-

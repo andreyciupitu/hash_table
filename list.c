@@ -3,13 +3,15 @@
 #include <string.h>
 
 #include "list.h"
+#include "utils.h"
 
 void init_list(list *head)
 {
-	/* Create a dummy node for easier processing */
-	*head = (struct node*)calloc(1, sizeof(struct node));
-	if (*head == NULL)
-		return;
+	/*
+	 * Create a dummy node for easier processing
+	 */
+	*head = calloc(1, sizeof(struct node));
+	DIE(*head == NULL, "Memory alloc error in bucket initialization");
 }
 
 void add_element(list head, char *data)
@@ -20,16 +22,19 @@ void add_element(list head, char *data)
 	while (it->next != NULL)
 		it = it->next;
 
-	/* Create the new node */
-	new = (struct node*)malloc(sizeof(struct node));
-	if (new == NULL)
-		return;
-	new->data = strdup(data);
-	if (new->data == NULL)
-		return;
+	/*
+	 * Create the new node
+	 */
+	new = malloc(sizeof(struct node));
+	DIE(new == NULL, "Memory alloc error in add");
+	new->data = calloc(strlen(data) + 1, sizeof(char));
+	strncpy(new->data, data, strlen(data));
+	DIE(new->data == NULL, "Memory alloc error in add");
 	new->next = NULL;
 
-	/* Add the new node to the end */
+	/*
+	 * Add the new node to the end
+	 */
 	it->next = new;
 }
 
@@ -41,7 +46,9 @@ void remove_element(list head, char *data)
 	it = head->next;
 	while (it != NULL) {
 		if (strcmp(data, it->data) == 0) {
-			/* Remove the node and free memory */
+			/*
+			 * Remove the node and free memory
+			 */
 			prev_it->next = it->next;
 			free(it->data);
 			free(it);
@@ -54,8 +61,12 @@ void remove_element(list head, char *data)
 
 int contains_element(list head, char *data)
 {
-	/* Jump over dummy node */
-	struct node *it = head->next;
+	struct node *it;
+
+	/*
+	 * Jump over dummy node
+	 */
+	it = head->next;
 
 	while (it != NULL) {
 		if (strcmp(data, it->data) == 0)
@@ -68,10 +79,16 @@ int contains_element(list head, char *data)
 
 void print_list(list head, FILE *output_file)
 {
-	/* Jump over dummy node */
-	struct node *it = head->next;
+	struct node *it;
 
-	/* Don't print anything for an empty list */
+	/*
+	 * Jump over dummy node
+	 */
+	it = head->next;
+
+	/*
+	 * Don't print anything for an empty list
+	 */
 	if (it == NULL)
 		return;
 
@@ -87,7 +104,9 @@ void clear_list(list head)
 	struct node *tmp;
 	struct node *it;
 
-	/* Jump over dummy node */
+	/*
+	 * Jump over dummy node
+	 */
 	it = head->next;
 
 	while (it != NULL) {
@@ -97,7 +116,9 @@ void clear_list(list head)
 		it = tmp;
 	}
 
-	/* Reset dummy node */
+	/*
+	 * Reset dummy node
+	 */
 	head->next = NULL;
 }
 
